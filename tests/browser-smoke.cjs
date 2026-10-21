@@ -1,0 +1,17 @@
+const { chromium }=require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+(async()=>{
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH || '/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+ const page=await browser.newPage({viewport:{width:1440,height:1100}});
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:3000');await page.screenshot({path:'/tmp/pmsc-desktop.png',fullPage:true});
+ for(const route of ['disciplinas','disciplinas/constitucional','aula/constitucional/0','plano','questoes','simulados','flashcards','redacao','desempenho','anotacoes','edital','foco']){await page.goto('http://127.0.0.1:3000/#'+route);await page.locator('h1').waitFor();console.log(route,await page.locator('h1').textContent());}
+ await page.goto('http://127.0.0.1:3000/#aula/constitucional/0');await page.locator('#mark-done').click();await page.locator('#lesson-notes').fill('Minha anotação de teste');await page.reload();if(await page.locator('#lesson-notes').inputValue()!=='Minha anotação de teste')throw Error('notes persistence');
+ await page.goto('http://127.0.0.1:3000/#questoes');await page.locator('[data-option="0"]').click();await page.locator('#confirm-answer').click();await page.locator('.explanation').waitFor();
+ await page.goto('http://127.0.0.1:3000/#flashcards');await page.locator('#reveal-card').click();await page.locator('[data-flash-rate="7"]').click();
+ await page.goto('http://127.0.0.1:3000/#redacao');await page.locator('#essay-text').fill('Uma tese clara sobre segurança e cidadania.');await page.locator('#nc').fill('18');await page.locator('#ne').fill('4');await page.locator('#tl').fill('20');if(!(await page.locator('#formula-result').textContent()).includes('17,80'))throw Error('essay formula');
+ await page.goto('http://127.0.0.1:3000/#simulados');await page.locator('#start-exam').click();for(let i=0;i<60;i++){await page.locator('[data-exam-answer="0"]').click();if(i<59)await page.locator('#exam-next').click();}await page.reload();if((await page.locator('.exam-sidebar p').first().textContent())!=='60/60 respostas marcadas')throw Error('exam persist');await page.locator('#finish-exam').click();await page.locator('#confirm-finish').click();if(!(await page.locator('.result-score').textContent()).includes('60'))throw Error('exam score');
+ await page.goto('http://127.0.0.1:3000/#edital');await page.waitForFunction(()=>document.querySelector('#syllabus').textContent.includes('Direito Constitucional'));
+ await page.goto('http://127.0.0.1:3000');await page.locator('#global-search').click();await page.locator('#search-input').fill('crase');await page.locator('[data-search-result]').first().click();await page.locator('#lesson-notes').waitFor();
+ await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:3000');await page.screenshot({path:'/tmp/pmsc-mobile.png',fullPage:true});for(const route of ['inicio','disciplinas','questoes','simulados','redacao','plano','edital']){await page.goto('http://127.0.0.1:3000/#'+route);const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);if(overflow)throw Error('overflow '+route);}
+ if(errors.length)throw Error(errors.join('\n'));console.log('PASS: routes, persistence, practice, flashcards, essay, 60-question exam, source, search, mobile overflow');await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});
